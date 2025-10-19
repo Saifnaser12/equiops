@@ -22,6 +22,7 @@ model Horse {
   prescriptions Prescription[]
   vaccinations  Vaccination[]
   movements     Movement[]
+  administrations Administration[]
 }
 
 model Medication {
@@ -33,6 +34,7 @@ model Medication {
   unit      String?
   routes    String[]
   defaultWithholdingHours Int?
+  prescriptionItems PrescriptionItem[]
 }
 
 model Prescription {
