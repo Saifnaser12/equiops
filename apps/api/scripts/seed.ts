@@ -48,6 +48,57 @@ async function main() {
     console.log(`✅ Medication upserted: ${medication.generic} (ID: ${medication.id})`);
   }
 
+  // Create sample prescriptions
+  console.log('💊 Creating sample prescriptions...');
+  
+  // Get the medications we just created
+  const flunixin = await prisma.medication.findUnique({ where: { generic: 'Flunixin' } });
+  const omeprazole = await prisma.medication.findUnique({ where: { generic: 'Omeprazole' } });
+  const dexamethasone = await prisma.medication.findUnique({ where: { generic: 'Dexamethasone' } });
+
+  if (flunixin && omeprazole && dexamethasone) {
+    // Create a prescription for Desert Comet
+    const prescription = await prisma.prescription.create({
+      data: {
+        horseId: horse.id,
+        vetId: 'vet-001', // Mock vet ID
+        diagnosis: 'Colic treatment and prevention',
+        items: {
+          create: [
+            {
+              medId: flunixin.id,
+              doseAmount: 1.1,
+              doseUnit: 'ml',
+              route: 'IV',
+              frequency: 'BID',
+              durationDays: 3,
+              withholdingHours: 24,
+            },
+            {
+              medId: omeprazole.id,
+              doseAmount: 20,
+              doseUnit: 'mg',
+              route: 'PO',
+              frequency: 'SID',
+              durationDays: 7,
+              withholdingHours: 0,
+            },
+            {
+              medId: dexamethasone.id,
+              doseAmount: 0.5,
+              doseUnit: 'ml',
+              route: 'IM',
+              frequency: 'BID',
+              durationDays: 5,
+              withholdingHours: 48,
+            },
+          ],
+        },
+      },
+    });
+    console.log(`✅ Prescription created with ID: ${prescription.id}`);
+  }
+
   console.log('🎉 Database seeding completed successfully!');
 }
 

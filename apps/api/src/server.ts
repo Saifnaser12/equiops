@@ -70,6 +70,23 @@ const AdministrationSchema = z.object({
   notes: z.string().optional(),
 });
 
+const PrescriptionItemSchema = z.object({
+  medId: z.string(),
+  doseAmount: z.number(),
+  doseUnit: z.string(),
+  route: z.string(),
+  frequency: z.string(),
+  durationDays: z.number(),
+  withholdingHours: z.number().optional(),
+});
+
+const PrescriptionSchema = z.object({
+  horseId: z.string(),
+  vetId: z.string(),
+  diagnosis: z.string().optional(),
+  items: z.array(PrescriptionItemSchema),
+});
+
 /**
  * @swagger
  * /healthz:
@@ -340,6 +357,180 @@ app.post('/administrations', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /prescriptions:
+ *   post:
+ *     summary: Create a new prescription with items
+ *     tags: [Prescriptions]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - horseId
+ *               - vetId
+ *               - items
+ *             properties:
+ *               horseId:
+ *                 type: string
+ *                 description: ID of the horse
+ *               vetId:
+ *                 type: string
+ *                 description: ID of the veterinarian
+ *               diagnosis:
+ *                 type: string
+ *                 description: Diagnosis or reason for prescription
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - medId
+ *                     - doseAmount
+ *                     - doseUnit
+ *                     - route
+ *                     - frequency
+ *                     - durationDays
+ *                   properties:
+ *                     medId:
+ *                       type: string
+ *                       description: ID of the medication
+ *                     doseAmount:
+ *                       type: number
+ *                       description: Dose amount
+ *                     doseUnit:
+ *                       type: string
+ *                       description: Dose unit (ml, mg, etc.)
+ *                     route:
+ *                       type: string
+ *                       description: Administration route (IV, IM, PO, etc.)
+ *                     frequency:
+ *                       type: string
+ *                       description: Frequency (e.g., "BID", "TID", "Q8H")
+ *                     durationDays:
+ *                       type: number
+ *                       description: Duration in days
+ *                     withholdingHours:
+ *                       type: number
+ *                       description: Withholding period in hours
+ *     responses:
+ *       201:
+ *         description: Prescription created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Prescription'
+ *       400:
+ *         description: Invalid request data
+ *       500:
+ *         description: Internal server error
+ */
+app.post('/prescriptions', async (req, res) => {
+  try {
+    const validatedData = PrescriptionSchema.parse(req.body);
+    
+    const prescription = await prisma.prescription.create({
+      data: {
+        horseId: validatedData.horseId,
+        vetId: validatedData.vetId,
+        diagnosis: validatedData.diagnosis,
+        items: {
+          create: validatedData.items.map(item => ({
+            medId: item.medId,
+            doseAmount: item.doseAmount,
+            doseUnit: item.doseUnit,
+            route: item.route,
+            frequency: item.frequency,
+            durationDays: item.durationDays,
+            withholdingHours: item.withholdingHours,
+          })),
+        },
+      },
+      include: {
+        items: {
+          include: {
+            med: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json(prescription);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Invalid request data', details: error.errors });
+    } else {
+      console.error('Error creating prescription:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+});
+
+/**
+ * @swagger
+ * /horses/{horseId}/prescriptions:
+ *   get:
+ *     summary: Get prescriptions for a specific horse
+ *     tags: [Prescriptions]
+ *     parameters:
+ *       - in: path
+ *         name: horseId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the horse
+ *       - in: query
+ *         name: active
+ *         schema:
+ *           type: boolean
+ *         description: Filter for active prescriptions (default true)
+ *     responses:
+ *       200:
+ *         description: Prescriptions retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Prescription'
+ *       400:
+ *         description: Invalid request parameters
+ *       500:
+ *         description: Internal server error
+ */
+app.get('/horses/:horseId/prescriptions', async (req, res) => {
+  try {
+    const { horseId } = req.params;
+    const active = req.query.active === 'true' || req.query.active === undefined;
+    
+    const prescriptions = await prisma.prescription.findMany({
+      where: {
+        horseId,
+        // For now, all prescriptions are considered active
+        // In the future, we could add an active field or check dates
+      },
+      include: {
+        items: {
+          include: {
+            med: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    res.json(prescriptions);
+  } catch (error) {
+    console.error('Error fetching prescriptions:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Swagger schema definitions
 /**
  * @swagger
@@ -429,6 +620,71 @@ app.post('/administrations', async (req, res) => {
  *         notes:
  *           type: string
  *           nullable: true
+ *     Prescription:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         horseId:
+ *           type: string
+ *         vetId:
+ *           type: string
+ *         diagnosis:
+ *           type: string
+ *           nullable: true
+ *         lockedByVet:
+ *           type: boolean
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         items:
+ *           type: array
+ *           items:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *               medId:
+ *                 type: string
+ *               doseAmount:
+ *                 type: number
+ *               doseUnit:
+ *                 type: string
+ *               route:
+ *                 type: string
+ *               frequency:
+ *                 type: string
+ *               durationDays:
+ *                 type: number
+ *               withholdingHours:
+ *                 type: number
+ *                 nullable: true
+ *               med:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                   generic:
+ *                     type: string
+ *                   brand:
+ *                     type: string
+ *                     nullable: true
+ *                   form:
+ *                     type: string
+ *                     nullable: true
+ *                   strength:
+ *                     type: string
+ *                     nullable: true
+ *                   unit:
+ *                     type: string
+ *                     nullable: true
+ *                   routes:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                   defaultWithholdingHours:
+ *                     type: number
+ *                     nullable: true
  */
 
 // Error handling middleware
