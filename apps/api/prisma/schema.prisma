@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,12 +7,139 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Horse {
+  id              String           @id @default(cuid())
+  name            String
+  microchipId     String?          @unique
+  passportNo      String?
+  eahsNo          String?
+  feiNo           String?
+  noRide          Boolean          @default(false)
+  medicalAlert    String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  vitals          Vitals[]
+  prescriptions   Prescription[]
+  vaccinations    Vaccination[]
+  movements       Movement[]
+  administrations Administration[]
+}
 
-  @@map("users")
+model Medication {
+  id                      String             @id @default(cuid())
+  generic                 String
+  brand                   String?
+  form                    String?
+  strength                String?
+  unit                    String?
+  routes                  String[]
+  defaultWithholdingHours Int?
+  prescriptionItems       PrescriptionItem[]
+}
+
+model Prescription {
+  id          String             @id @default(cuid())
+  horseId     String
+  vetId       String
+  diagnosis   String?
+  lockedByVet Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+  horse       Horse              @relation(fields: [horseId], references: [id])
+  items       PrescriptionItem[]
+}
+
+model PrescriptionItem {
+  id               String           @id @default(cuid())
+  rxId             String
+  medId            String
+  doseAmount       Float
+  doseUnit         String
+  route            String
+  frequency        String
+  durationDays     Int
+  withholdingHours Int?
+  rx               Prescription     @relation(fields: [rxId], references: [id])
+  med              Medication       @relation(fields: [medId], references: [id])
+  administrations  Administration[]
+}
+
+model Administration {
+  id            String           @id @default(cuid())
+  rxItemId      String
+  horseId       String
+  datetimeLocal DateTime
+  actualDose    Float?
+  route         String?
+  batchNo       String?
+  lotNo         String?
+  expiryDate    DateTime?
+  barcodeValue  String?
+  notes         String?
+  rxItem        PrescriptionItem @relation(fields: [rxItemId], references: [id])
+  horse         Horse            @relation(fields: [horseId], references: [id])
+}
+
+model Vaccination {
+  id           String    @id @default(cuid())
+  horseId      String
+  product      String
+  batchNo      String?
+  expiryDate   DateTime?
+  doseDatetime DateTime
+  site         String?
+  vetId        String?
+  horse        Horse     @relation(fields: [horseId], references: [id])
+}
+
+model Vitals {
+  id                 String   @id @default(cuid())
+  horseId            String
+  recordedByUserId   String?
+  datetimeLocal      DateTime
+  temperatureC       Float?
+  heartRateBpm       Int?
+  respiratoryRateBpm Int?
+  source             Source
+  horse              Horse    @relation(fields: [horseId], references: [id])
+}
+
+enum Source {
+  manual
+  microchip
+  device_webhook
+}
+
+model Movement {
+  id        String          @id @default(cuid())
+  horseId   String
+  reason    String // show | vet | sale | training
+  fromLoc   String
+  toLoc     String
+  departAt  DateTime
+  hauler    String?
+  createdAt DateTime        @default(now())
+  precheck  PretravelCheck?
+  horse     Horse           @relation(fields: [horseId], references: [id])
+}
+
+model PretravelCheck {
+  id             String    @id @default(cuid())
+  movementId     String    @unique
+  passportOk     Boolean
+  vaxUpToDate    Boolean
+  lastTempC      Float?
+  fitnessOkByVet Boolean
+  fitnessAt      DateTime?
+  notes          String?
+  movement       Movement  @relation(fields: [movementId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  action     String
+  changedBy  String?
+  changedAt  DateTime @default(now())
+  diffJson   String?
 }
