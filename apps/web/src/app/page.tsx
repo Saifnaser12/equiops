@@ -92,9 +92,15 @@ export default function VitalsQuickEntry() {
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
               Vitals Quick Entry
             </h1>
-            <p className="text-gray-600 text-sm">
+            <p className="text-gray-600 text-sm mb-4">
               Record horse vitals quickly and easily
             </p>
+            <a
+              href="/dose-tasks"
+              className="inline-block px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              View Dose Tasks →
+            </a>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
