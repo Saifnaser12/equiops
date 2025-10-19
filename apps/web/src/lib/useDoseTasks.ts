@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 export interface DoseTask {
   id: string;
@@ -15,6 +15,7 @@ export interface DoseTask {
   expiryDate?: Date;
   barcodeValue?: string;
   notes?: string;
+  rxItemId?: string; // For real data mode
 }
 
 export interface MarkGivenPayload {
@@ -25,7 +26,38 @@ export interface MarkGivenPayload {
   notes?: string;
 }
 
-// Mock data - 12 tasks across 8 horses
+export interface PrescriptionItem {
+  id: string;
+  medId: string;
+  doseAmount: number;
+  doseUnit: string;
+  route: string;
+  frequency: string;
+  durationDays: number;
+  withholdingHours?: number;
+  med: {
+    id: string;
+    generic: string;
+    brand?: string;
+    form?: string;
+    strength?: string;
+    unit?: string;
+    routes: string[];
+    defaultWithholdingHours?: number;
+  };
+}
+
+export interface Prescription {
+  id: string;
+  horseId: string;
+  vetId: string;
+  diagnosis?: string;
+  lockedByVet: boolean;
+  createdAt: string;
+  items: PrescriptionItem[];
+}
+
+// Mock data - 12 tasks across 8 horses (fallback)
 const mockTasks: DoseTask[] = [
   // Overdue tasks (2+)
   {
@@ -152,8 +184,84 @@ const mockTasks: DoseTask[] = [
   },
 ];
 
+// Function to synthesize dose schedule from prescription items
+function synthesizeDoseSchedule(prescriptions: Prescription[]): DoseTask[] {
+  const tasks: DoseTask[] = [];
+  const now = new Date();
+  
+  prescriptions.forEach(prescription => {
+    prescription.items.forEach(item => {
+      // Create 3 doses for today: now-2h, now, now+2h
+      const times = [
+        new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2 hours ago
+        new Date(now.getTime()), // now
+        new Date(now.getTime() + 2 * 60 * 60 * 1000), // 2 hours from now
+      ];
+      
+      times.forEach((time, index) => {
+        tasks.push({
+          id: `${item.id}-${index}`,
+          horseName: 'Desert Comet', // We'll get this from the prescription data
+          medName: item.med.generic,
+          dose: item.doseAmount,
+          unit: item.doseUnit,
+          route: item.route,
+          dueTime: time,
+          isCompleted: false,
+          rxItemId: item.id,
+        });
+      });
+    });
+  });
+  
+  return tasks;
+}
+
 export function useDoseTasks() {
   const [tasks, setTasks] = useState<DoseTask[]>(mockTasks);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [useRealData, setUseRealData] = useState(true); // Toggle for real data mode
+
+  // Fetch real prescription data
+  useEffect(() => {
+    if (!useRealData) return;
+
+    const fetchPrescriptions = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+        
+        // For now, we'll use a placeholder horse ID
+        // In a real app, you'd get this from user context or route params
+        // We'll need to add a horses endpoint or get this from the seed data
+        const horseId = 'placeholder-horse-id';
+        const response = await fetch(`${apiUrl}/horses/${horseId}/prescriptions?active=true`);
+        
+        if (!response.ok) {
+          // If the endpoint doesn't exist or horse not found, fall back to mock data
+          console.log('Prescriptions endpoint not available, using mock data');
+          setTasks(mockTasks);
+          return;
+        }
+        
+        const prescriptions: Prescription[] = await response.json();
+        const realTasks = synthesizeDoseSchedule(prescriptions);
+        setTasks(realTasks);
+      } catch (err) {
+        console.error('Error fetching prescriptions:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch prescriptions');
+        // Fall back to mock data on error
+        setTasks(mockTasks);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPrescriptions();
+  }, [useRealData]);
 
   const { overdue, dueNow, dueLater } = useMemo(() => {
     const now = new Date();
@@ -166,23 +274,85 @@ export function useDoseTasks() {
     };
   }, [tasks]);
 
-  const markGiven = (taskId: string, payload: MarkGivenPayload) => {
-    setTasks(prevTasks =>
-      prevTasks.map(task =>
-        task.id === taskId
-          ? {
-              ...task,
-              isCompleted: true,
-              completedAt: new Date(),
-              batchNo: payload.batchNo,
-              lotNo: payload.lotNo,
-              expiryDate: payload.expiryDate,
-              barcodeValue: payload.barcodeValue,
-              notes: payload.notes,
-            }
-          : task
-      )
-    );
+  const markGiven = async (taskId: string, payload: MarkGivenPayload) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // If using real data and we have an rxItemId, post to administrations endpoint
+    if (useRealData && task.rxItemId) {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+        
+        const administrationData = {
+          rxItemId: task.rxItemId,
+          horseId: 'placeholder-horse-id', // This should come from the task or context
+          datetimeLocal: new Date().toISOString(),
+          actualDose: task.dose,
+          route: task.route,
+          batchNo: payload.batchNo,
+          lotNo: payload.lotNo,
+          expiryDate: payload.expiryDate?.toISOString(),
+          barcodeValue: payload.barcodeValue,
+          notes: payload.notes,
+        };
+
+        const response = await fetch(`${apiUrl}/administrations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(administrationData),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to create administration: ${response.statusText}`);
+        }
+
+        // Update local state on success
+        setTasks(prevTasks =>
+          prevTasks.map(t =>
+            t.id === taskId
+              ? {
+                  ...t,
+                  isCompleted: true,
+                  completedAt: new Date(),
+                  batchNo: payload.batchNo,
+                  lotNo: payload.lotNo,
+                  expiryDate: payload.expiryDate,
+                  barcodeValue: payload.barcodeValue,
+                  notes: payload.notes,
+                }
+              : t
+          )
+        );
+      } catch (err) {
+        console.error('Error creating administration:', err);
+        setError(err instanceof Error ? err.message : 'Failed to mark as given');
+        throw err; // Re-throw so the UI can handle it
+      }
+    } else {
+      // Mock data mode - just update local state
+      setTasks(prevTasks =>
+        prevTasks.map(t =>
+          t.id === taskId
+            ? {
+                ...t,
+                isCompleted: true,
+                completedAt: new Date(),
+                batchNo: payload.batchNo,
+                lotNo: payload.lotNo,
+                expiryDate: payload.expiryDate,
+                barcodeValue: payload.barcodeValue,
+                notes: payload.notes,
+              }
+            : t
+        )
+      );
+    }
+  };
+
+  const toggleDataMode = () => {
+    setUseRealData(!useRealData);
   };
 
   return {
@@ -191,5 +361,9 @@ export function useDoseTasks() {
     dueNow,
     dueLater,
     markGiven,
+    isLoading,
+    error,
+    useRealData,
+    toggleDataMode,
   };
 }

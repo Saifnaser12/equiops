@@ -264,7 +264,16 @@ function TaskCard({ task, onMarkGiven }: { task: DoseTask; onMarkGiven: (task: D
 }
 
 export default function DoseTasksPage() {
-  const { overdue, dueNow, dueLater, markGiven } = useDoseTasks();
+  const { 
+    overdue, 
+    dueNow, 
+    dueLater, 
+    markGiven, 
+    isLoading, 
+    error, 
+    useRealData, 
+    toggleDataMode 
+  } = useDoseTasks();
   const [selectedTask, setSelectedTask] = useState<DoseTask | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -281,8 +290,13 @@ export default function DoseTasksPage() {
     setIsModalOpen(true);
   };
 
-  const handleMarkGivenSubmit = (taskId: string, payload: MarkGivenPayload) => {
-    markGiven(taskId, payload);
+  const handleMarkGivenSubmit = async (taskId: string, payload: MarkGivenPayload) => {
+    try {
+      await markGiven(taskId, payload);
+    } catch (err) {
+      console.error('Failed to mark as given:', err);
+      // The error is already handled in the hook and displayed via error state
+    }
   };
 
   const sections = [
@@ -295,7 +309,27 @@ export default function DoseTasksPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="sticky top-0 bg-white shadow-sm z-10">
         <div className="px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Dose Tasks</h1>
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold text-gray-900">Dose Tasks</h1>
+            <button
+              onClick={toggleDataMode}
+              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                useRealData
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {useRealData ? 'Real Data' : 'Mock Data'}
+            </button>
+          </div>
+          
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">
+                Error: {error}. Using mock data as fallback.
+              </p>
+            </div>
+          )}
           
           <div className="flex space-x-2 overflow-x-auto pb-2">
             {sections.map((section) => (
@@ -318,29 +352,36 @@ export default function DoseTasksPage() {
       </div>
 
       <div className="px-4 py-6 space-y-8">
-        {sections.map((section) => (
-          <div key={section.title} ref={section.ref}>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              {section.title} ({section.count})
-            </h2>
-            
-            {section.tasks.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No {section.title.toLowerCase()} tasks
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {section.tasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onMarkGiven={handleMarkGiven}
-                  />
-                ))}
-              </div>
-            )}
+        {isLoading ? (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="mt-2 text-gray-600">Loading prescriptions...</p>
           </div>
-        ))}
+        ) : (
+          sections.map((section) => (
+            <div key={section.title} ref={section.ref}>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                {section.title} ({section.count})
+              </h2>
+              
+              {section.tasks.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No {section.title.toLowerCase()} tasks
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {section.tasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onMarkGiven={handleMarkGiven}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
       <MarkGivenModal
