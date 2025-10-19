@@ -1,0 +1,27 @@
+{
+  "name": "@workspace/api",
+  "version": "1.0.0",
+  "description": "API application",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node index.js",
+    "build": "echo 'Build script'",
+    "start": "node index.js",
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:reset": "prisma migrate reset",
+    "generate": "prisma generate",
+    "studio": "prisma studio",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.7.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.7.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}
