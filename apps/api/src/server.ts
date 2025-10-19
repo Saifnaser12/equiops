@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -8,7 +8,7 @@ import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
-import { allowRoles, requireAuth } from './middleware/auth';
+import { allowRoles, requireAuth, AuthenticatedRequest } from './middleware/auth';
 import { logAuditEvent, createAuditDiff } from './utils/audit';
 
 const app = express();
@@ -206,7 +206,7 @@ app.get('/healthz', (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.post('/vitals', async (req, res) => {
+app.post('/vitals', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const validatedData = VitalsSchema.parse(req.body);
     
@@ -293,7 +293,7 @@ app.post('/vitals', async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.post('/vaccinations', allowRoles('MANAGER', 'VET'), async (req, res) => {
+app.post('/vaccinations', allowRoles('MANAGER', 'VET'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const validatedData = VaccinationSchema.parse(req.body);
     
@@ -381,7 +381,7 @@ app.post('/vaccinations', allowRoles('MANAGER', 'VET'), async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.post('/administrations', allowRoles('MANAGER', 'VET'), async (req, res) => {
+app.post('/administrations', allowRoles('MANAGER', 'VET'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const validatedData = AdministrationSchema.parse(req.body);
     
@@ -482,7 +482,7 @@ app.post('/administrations', allowRoles('MANAGER', 'VET'), async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.post('/prescriptions', allowRoles('MANAGER', 'VET'), async (req, res) => {
+app.post('/prescriptions', allowRoles('MANAGER', 'VET'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const validatedData = PrescriptionSchema.parse(req.body);
     
@@ -564,7 +564,7 @@ app.post('/prescriptions', allowRoles('MANAGER', 'VET'), async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.get('/horses/:horseId/prescriptions', requireAuth, async (req, res) => {
+app.get('/horses/:horseId/prescriptions', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { horseId } = req.params;
     const active = req.query.active === 'true' || req.query.active === undefined;
@@ -645,7 +645,7 @@ app.get('/horses/:horseId/prescriptions', requireAuth, async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.post('/billing/charges', allowRoles('MANAGER', 'BILLING'), async (req, res) => {
+app.post('/billing/charges', allowRoles('MANAGER', 'BILLING'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const validatedData = ChargeSchema.parse(req.body);
     
@@ -710,7 +710,7 @@ app.post('/billing/charges', allowRoles('MANAGER', 'BILLING'), async (req, res) 
  *       500:
  *         description: Internal server error
  */
-app.get('/billing/charges', requireAuth, async (req, res) => {
+app.get('/billing/charges', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { horseId, from, to } = req.query;
     
@@ -778,7 +778,7 @@ app.get('/billing/charges', requireAuth, async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.post('/billing/invoices', allowRoles('MANAGER', 'BILLING'), async (req, res) => {
+app.post('/billing/invoices', allowRoles('MANAGER', 'BILLING'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const validatedData = InvoiceSchema.parse(req.body);
     
@@ -875,7 +875,7 @@ app.post('/billing/invoices', allowRoles('MANAGER', 'BILLING'), async (req, res)
  *       500:
  *         description: Internal server error
  */
-app.get('/billing/invoices/:id', requireAuth, async (req, res) => {
+app.get('/billing/invoices/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     
@@ -932,7 +932,7 @@ app.get('/billing/invoices/:id', requireAuth, async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.get('/billing/invoices/:id/pdf', requireAuth, async (req, res) => {
+app.get('/billing/invoices/:id/pdf', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     
@@ -1073,7 +1073,7 @@ app.get('/billing/invoices/:id/pdf', requireAuth, async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.patch('/billing/invoices/:id', allowRoles('MANAGER', 'BILLING'), async (req, res) => {
+app.patch('/billing/invoices/:id', allowRoles('MANAGER', 'BILLING'), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
     const validatedData = InvoiceUpdateSchema.parse(req.body);
@@ -1143,13 +1143,13 @@ app.patch('/billing/invoices/:id', allowRoles('MANAGER', 'BILLING'), async (req,
  *       500:
  *         description: Internal server error
  */
-app.post('/import/horses-csv', upload.single('file'), async (req, res) => {
+app.post('/import/horses-csv', upload.single('file'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const csvData = req.file.buffer.toString('utf-8');
+    const csvData = (req.file as Express.Multer.File).buffer.toString('utf-8');
     const lines = csvData.split('\n').filter(line => line.trim());
     
     if (lines.length < 2) {
@@ -1226,7 +1226,7 @@ app.post('/import/horses-csv', upload.single('file'), async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.get('/export/vaccinations.csv', async (req, res) => {
+app.get('/export/vaccinations.csv', async (req: Request, res: Response) => {
   try {
     const { from, to } = req.query;
     
@@ -1293,7 +1293,7 @@ app.get('/export/vaccinations.csv', async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.get('/export/administrations.csv', async (req, res) => {
+app.get('/export/administrations.csv', async (req: Request, res: Response) => {
   try {
     const { from, to } = req.query;
     

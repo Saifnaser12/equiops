@@ -1,6 +1,4 @@
 "use strict";
-// Simple role-based access control middleware
-// In a real application, this would integrate with proper authentication
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.allowRoles = allowRoles;
 exports.requireAuth = requireAuth;

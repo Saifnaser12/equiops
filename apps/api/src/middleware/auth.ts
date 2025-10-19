@@ -1,3 +1,5 @@
+import express from 'express';
+
 // Simple role-based access control middleware
 // In a real application, this would integrate with proper authentication
 
