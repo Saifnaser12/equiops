@@ -1,0 +1,15 @@
+{
+  "name": "@equiops/config",
+  "version": "1.0.0",
+  "description": "Shared configuration for EquiOps",
+  "main": "index.js",
+  "files": [
+    "tsconfig",
+    "eslint"
+  ],
+  "scripts": {
+    "lint": "echo 'No linting needed for config package'",
+    "typecheck": "echo 'No typechecking needed for config package'",
+    "clean": "echo 'No cleaning needed for config package'"
+  }
+}
