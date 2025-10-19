@@ -30,12 +30,24 @@ cd apps/api
 - **Generate Prisma client**: `npm run generate`
 - **Open Prisma Studio**: `npm run studio`
 
+#### Database Seeding
+
+- **Seed database with sample data**: `npm run seed`
+
+The seed script will:
+- Upsert a horse named "Desert Comet" and log its ID
+- Upsert three medications:
+  - Flunixin (routes: IV, IM)
+  - Omeprazole (routes: PO)
+  - Dexamethasone (routes: IV, IM, PO)
+
 #### Database Setup
 
 1. Copy the environment file: `cp .env.example .env`
 2. Update the `DATABASE_URL` in `.env` with your PostgreSQL connection string
 3. Run migrations: `npm run migrate`
 4. Generate the Prisma client: `npm run generate`
+5. (Optional) Seed the database: `npm run seed`
 
 ### Environment Variables
 
@@ -59,3 +71,15 @@ The Prisma schema includes models for:
 - **Movement**: Horse transportation records
 - **PretravelCheck**: Pre-travel health checks
 - **AuditLog**: System audit trail
+
+### Seed Data
+
+The application includes a seed script (`scripts/seed.ts`) that populates the database with initial data:
+
+- **Horse**: "Desert Comet"
+- **Medications**: 
+  - Flunixin (IV, IM routes)
+  - Omeprazole (PO route)
+  - Dexamethasone (IV, IM, PO routes)
+
+Run `npm run seed` to populate your database with this sample data.
